@@ -14,6 +14,7 @@ from moshi_mlx.modules.seanet import SeanetResnetBlock, StreamingAdd
 
 
 def setUpModule():
+    unittest.addModuleCleanup(mx.set_default_device, mx.default_device())
     mx.set_default_device(mx.cpu)
 
 
@@ -110,21 +111,21 @@ class StreamingResetTest(unittest.TestCase):
                 max_seq_len=32,
             ),
         )
-        mimi = Mimi(cfg)
-        # Give the untrained codebooks nonzero embeddings without a checkpoint.
-        for rvq in (mimi.quantizer.rvq_first, mimi.quantizer.rvq_rest):
-            for layer in rvq.vq.layers:
-                codebook = layer.codebook
-                codebook.embedding_sum = mx.random.normal(
-                    (cfg.quantizer_bins, cfg.quantizer_dim)
-                )
-                codebook.cluster_usage = mx.ones(cfg.quantizer_bins)
-                codebook.update_in_place()
         codes = mx.array([[[1, 2, 3], [4, 5, 6]]], dtype=mx.int32)
-        expected = np.array(stream(mimi.decode_step, codes))
-        self.assertEqual(expected.shape, (1, 1, 24))
         for lhs_longer in (True, False):
             with self.subTest(lhs_longer=lhs_longer):
+                mimi = Mimi(cfg)
+                # Give the untrained codebooks nonzero embeddings without a checkpoint.
+                for rvq in (mimi.quantizer.rvq_first, mimi.quantizer.rvq_rest):
+                    for layer in rvq.vq.layers:
+                        codebook = layer.codebook
+                        codebook.embedding_sum = mx.random.normal(
+                            (cfg.quantizer_bins, cfg.quantizer_dim)
+                        )
+                        codebook.cluster_usage = mx.ones(cfg.quantizer_bins)
+                        codebook.update_in_place()
+                expected = np.array(stream(mimi.decode_step, codes))
+                self.assertEqual(expected.shape, (1, 1, 24))
                 # Exercise reset with samples waiting on either residual branch.
                 for index, layer in enumerate(mimi.decoder.layers):
                     channels = cfg.seanet.nfilters * (
