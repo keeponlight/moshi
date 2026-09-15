@@ -33,6 +33,7 @@ class StreamingAdd(nn.Module):
         self._rhs = None
 
     def reset_state(self):
+        """Clear samples buffered between streaming steps."""
         self._lhs = None
         self._rhs = None
 
